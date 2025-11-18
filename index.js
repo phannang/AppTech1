@@ -1,17 +1,9 @@
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcrypt'); // Thêm bcrypt
-const jwt = require('jsonwebtoken'); // Thêm jwt
-
 const app = express();
 
 app.use(cors());
-app.use(express.json()); // Rất quan trọng để đọc body JSON
-
-// --- DỮ LIỆU GIẢ LẬP ---
-// (Sau này bạn sẽ thay bằng Database)
-const users = []; // Mảng để lưu user đã đăng ký
-const JWT_SECRET = "day_la_khoa_bi_mat_cua_ban_123456"; // Đổi thành bí mật của bạn
+app.use(express.json());
 
 const products = [
   {
@@ -22,7 +14,22 @@ const products = [
     description: "Chip Core i9, RAM 32GB, Card RTX 4070. Màn hình 240Hz.",
     category: "Laptop"
   },
-  // ... (các sản phẩm khác của bạn)
+  {
+    id: 2,
+    name: "Điện Thoại Flagship S25 Ultra",
+    price: 24990000,
+    imageUrl: "https://placehold.co/600x800/3b82f6/ffffff?text=Phone+S25",
+    description: "Camera 200MP, Màn hình Dynamic AMOLED, Pin 5000mAh. Hỗ trợ 5G.",
+    category: "Điện Thoại"
+  },
+  {
+    id: 3,
+    name: "Màn Hình Cong 34 inch UltraWide",
+    price: 9500000,
+    imageUrl: "https://placehold.co/600x800/a855f7/ffffff?text=Monitor+34",
+    description: "Độ phân giải 2K, Tấm nền VA, Tần số quét 144Hz. Hỗ trợ HDR.",
+    category: "Màn Hình"
+  },
   {
     id: 4,
     name: "Tai Nghe Không Dây Noise Cancelling",
@@ -33,12 +40,11 @@ const products = [
   }
 ];
 
-// --- API SẢN PHẨM (GET) ---
 app.get('/api/products', (req, res) => {
   res.json(products);
 });
 
-// 
+//
 // *** ĐÂY LÀ ROUTE MỚI ĐÃ THÊM VÀO ***
 //
 // --- API TẠO SẢN PHẨM MỚI (POST /api/products) ---
@@ -81,9 +87,9 @@ app.post('/api/products', (req, res) => {
     res.status(500).json({ message: "Lỗi server khi thêm sản phẩm" });
   }
 });
-// 
+//
 // *** KẾT THÚC ROUTE MỚI ***
-// 
+//
 
 
 // --- API ĐĂNG KÝ MỚI (POST /api/register) ---
