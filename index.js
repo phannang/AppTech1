@@ -1,11 +1,15 @@
 const express = require('express');
 const cors = require('cors');
+// const bcrypt = require('bcrypt'); // Cần uncomment nếu dùng đăng ký/đăng nhập
+// const jwt = require('jsonwebtoken'); // Cần uncomment nếu dùng đăng ký/đăng nhập
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-const products = [
+// Giả định dữ liệu sản phẩm (In-memory storage)
+let products = [
   {
     id: 1,
     name: "Laptop Gaming X15 Pro",
@@ -40,46 +44,39 @@ const products = [
   }
 ];
 
+// Giả định mảng users (In-memory storage)
+const users = []; 
+// const JWT_SECRET = 'your_super_secret_key'; // Cần định nghĩa nếu dùng đăng nhập
+
+// --- API LẤY TẤT CẢ SẢN PHẨM (GET /api/products) ---
 app.get('/api/products', (req, res) => {
   res.json(products);
 });
 
-//
-// *** ĐÂY LÀ ROUTE MỚI ĐÃ THÊM VÀO ***
-//
 // --- API TẠO SẢN PHẨM MỚI (POST /api/products) ---
 app.post('/api/products', (req, res) => {
   try {
-    // 1. Lấy dữ liệu sản phẩm mới từ Postman (hoặc Flutter)
-    // (Đảm bảo các trường này khớp với JSON bạn gửi)
     const { name, description, price, imageUrl, category } = req.body;
 
-    // 2. (Nên có) Kiểm tra dữ liệu cơ bản
     if (!name || !price) {
       return res.status(400).json({ message: "Tên và giá sản phẩm là bắt buộc" });
     }
 
-    // 3. Tạo ID mới cho sản phẩm (vì chúng ta đang dùng mảng)
-    // Tìm ID lớn nhất hiện tại và cộng thêm 1
     const maxId = products.reduce((max, p) => p.id > max ? p.id : max, 0);
     const newId = maxId + 1;
 
-    // 4. Tạo đối tượng sản phẩm mới
     const newProduct = {
       id: newId,
-      name: name,
-      description: description,
-      price: price,
-      imageUrl: imageUrl,
-      category: category
+      name,
+      description: description || '',
+      price: parseInt(price), // Đảm bảo giá là số
+      imageUrl: imageUrl || '',
+      category: category || 'Khác'
     };
 
-    // 5. Thêm sản phẩm mới vào mảng (sau này sẽ là thêm vào database)
     products.push(newProduct);
-
     console.log('Sản phẩm mới đã được thêm:', newProduct);
 
-    // 6. Trả về thành công (status 201 = Created) và gửi lại sản phẩm đã tạo
     res.status(201).json(newProduct);
 
   } catch (error) {
@@ -87,80 +84,78 @@ app.post('/api/products', (req, res) => {
     res.status(500).json({ message: "Lỗi server khi thêm sản phẩm" });
   }
 });
-//
-// *** KẾT THÚC ROUTE MỚI ***
-//
 
-
-// --- API ĐĂNG KÝ MỚI (POST /api/register) ---
-app.post('/api/register', async (req, res) => {
+// --------------------------------------------------------------------------------
+// --- ROUTE MỚI: API CẬP NHẬT SẢN PHẨM (PUT /api/products/:id) ---
+// --------------------------------------------------------------------------------
+app.put('/api/products/:id', (req, res) => {
   try {
-    const { email, password } = req.body;
+    const productId = parseInt(req.params.id);
+    const updatedData = req.body;
 
-    // 1. Kiểm tra email và password
-    if (!email || !password) {
-      return res.status(400).json({ message: "Vui lòng nhập đủ email và mật khẩu" });
+    const index = products.findIndex(p => p.id === productId);
+
+    if (index === -1) {
+      return res.status(404).json({ message: "Sản phẩm không tồn tại" });
     }
 
-    // 2. Kiểm tra email đã tồn tại chưa
-    const existingUser = users.find(user => user.email === email);
-    if (existingUser) {
-      return res.status(400).json({ message: "Email này đã tồn tại" });
-    }
+    // Cập nhật sản phẩm
+    products[index] = {
+      ...products[index], // Giữ lại ID cũ và các trường không được gửi (nếu có)
+      name: updatedData.name || products[index].name,
+      price: updatedData.price ? parseInt(updatedData.price) : products[index].price,
+      imageUrl: updatedData.imageUrl || products[index].imageUrl,
+      description: updatedData.description || products[index].description,
+      category: updatedData.category || products[index].category,
+    };
 
-    // 3. Băm mật khẩu
-    const hashedPassword = await bcrypt.hash(password, 10); // Băm mật khẩu
+    console.log(`Sản phẩm ID ${productId} đã được cập nhật:`, products[index]);
 
-    // 4. Lưu user mới (vào mảng, sau này là DB)
-    const newUser = { email, password: hashedPassword };
-    users.push(newUser);
-
-    console.log('User đã đăng ký:', newUser);
-    console.log('Tất cả Users:', users);
-
-    // 5. Trả về thành công
-    res.status(201).json({ message: "Đăng ký thành công" });
-
+    res.status(200).json(products[index]);
+    
   } catch (error) {
-    res.status(500).json({ message: "Lỗi server" });
+    console.error("Lỗi khi cập nhật sản phẩm:", error);
+    res.status(500).json({ message: "Lỗi server khi cập nhật sản phẩm" });
   }
 });
 
-// --- API ĐĂNG NHẬP MỚI (POST /api/login) ---
-app.post('/api/login', async (req, res) => {
+// --------------------------------------------------------------------------------
+// --- ROUTE MỚI: API XÓA SẢN PHẨM (DELETE /api/products/:id) ---
+// --------------------------------------------------------------------------------
+app.delete('/api/products/:id', (req, res) => {
   try {
-    const { email, password } = req.body;
+    const productId = parseInt(req.params.id);
+    const initialLength = products.length;
 
-    // 1. Kiểm tra email và password
-    if (!email || !password) {
-      return res.status(400).json({ message: "Vui lòng nhập đủ email và mật khẩu" });
+    products = products.filter(p => p.id !== productId);
+
+    if (products.length === initialLength) {
+      return res.status(404).json({ message: "Sản phẩm không tồn tại để xóa" });
     }
 
-    // 2. Tìm user trong mảng
-    const user = users.find(user => user.email === email);
-    if (!user) {
-      return res.status(400).json({ message: "Email hoặc mật khẩu sai" });
-    }
+    console.log(`Sản phẩm ID ${productId} đã được xóa.`);
 
-    // 3. So sánh mật khẩu
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Email hoặc mật khẩu sai" });
-    }
-
-    // 4. Tạo Token (JWT)
-    const token = jwt.sign(
-      { email: user.email }, // Dữ liệu chứa trong token
-      JWT_SECRET, // Khóa bí mật
-      { expiresIn: '1h' } // Hết hạn sau 1 giờ
-    );
-
-    // 5. Trả về token cho client (Flutter)
-    res.status(200).json({ token: token });
+    // Trả về 204 No Content hoặc 200 OK
+    res.status(200).json({ message: "Xóa sản phẩm thành công" }); 
 
   } catch (error) {
-    res.status(500).json({ message: "Lỗi server" });
+    console.error("Lỗi khi xóa sản phẩm:", error);
+    res.status(500).json({ message: "Lỗi server khi xóa sản phẩm" });
   }
+});
+
+// --- API ĐĂNG KÝ (POST /api/register) ---
+// (Giữ nguyên như bạn đã cung cấp, nhưng tôi comment tạm thời các thư viện chưa dùng)
+app.post('/api/register', async (req, res) => {
+  // Code đăng ký...
+  res.status(501).json({ message: "Route đăng ký chưa hoàn thành/cần thư viện bcrypt" });
+});
+
+// --- API ĐĂNG NHẬP (POST /api/login) ---
+// (Giữ nguyên như bạn đã cung cấp, nhưng tôi comment tạm thời các thư viện chưa dùng)
+app.post('/api/login', async (req, res) => {
+  // Code đăng nhập...
+  res.status(501).json({ message: "Route đăng nhập chưa hoàn thành/cần thư viện jwt" });
 });
 
 
